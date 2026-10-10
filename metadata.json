@@ -1,0 +1,6 @@
+{
+  "name": "Do-Re-MInsieme - Gestione Scuola di Canto e Musica",
+  "description": "Gestionale per la scuola di canto Do-Re-MInsieme: anagrafiche allievi, moduli iscrizione, pagamenti con ricevute progressive stampabili, corsi e gruppi, calendario lezioni ricorrenti, preventivi laboratori scuole e storico per anno scolastico.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
