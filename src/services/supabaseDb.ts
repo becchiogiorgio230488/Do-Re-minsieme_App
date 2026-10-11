@@ -127,6 +127,27 @@ function mapStudentToDb(student: Student): any {
 }
 
 function mapLessonFromDb(row: any): Lesson {
+  let eventType = row.event_type;
+  let eventCategory = row.event_category;
+  const eventColor = row.event_color;
+  const description = row.description;
+
+  // Fallback check if category was encoded in notes
+  let cleanNotes = row.notes;
+  if (!eventType && cleanNotes && cleanNotes.includes('[EVENTO:')) {
+    const match = cleanNotes.match(/\[EVENTO:([^\]]*)\]/);
+    if (match) {
+      eventType = 'appuntamento';
+      eventCategory = match[1] || 'altro';
+      cleanNotes = cleanNotes.replace(/\[EVENTO:[^\]]*\]\s*/, '');
+    }
+  }
+
+  if (!eventType) {
+    const isGeneric = !row.student_id && !row.course_id && (!row.student_ids || row.student_ids.length === 0);
+    eventType = isGeneric ? 'appuntamento' : 'lezione';
+  }
+
   return {
     id: row.id,
     academicYearId: row.academic_year_id,
@@ -141,16 +162,30 @@ function mapLessonFromDb(row: any): Lesson {
     status: row.status || 'programmata',
     isRecurringInstance: Boolean(row.is_recurring_instance),
     recurringSeriesId: row.recurring_series_id || undefined,
+    eventType: eventType as any,
+    eventCategory: eventCategory as any,
+    eventColor: eventColor || undefined,
+    description: description || undefined,
     topicsCovered: row.topics_covered || undefined,
     songsStudied: Array.isArray(row.songs_studied) ? row.songs_studied : undefined,
     lessonRating: row.lesson_rating || undefined,
     homework: row.homework || undefined,
     nextGoals: row.next_goals || undefined,
-    notes: row.notes || undefined,
+    notes: cleanNotes || undefined,
   };
 }
 
 function mapLessonToDb(lesson: Lesson): any {
+  const isGeneric = lesson.eventType === 'appuntamento';
+  let finalNotes = lesson.notes || null;
+  if (isGeneric && lesson.eventCategory) {
+    if (!finalNotes) {
+      finalNotes = `[EVENTO:${lesson.eventCategory}]`;
+    } else if (!finalNotes.includes('[EVENTO:')) {
+      finalNotes = `[EVENTO:${lesson.eventCategory}] ${finalNotes}`;
+    }
+  }
+
   return {
     id: lesson.id,
     academic_year_id: lesson.academicYearId,
@@ -165,12 +200,16 @@ function mapLessonToDb(lesson: Lesson): any {
     status: lesson.status,
     is_recurring_instance: Boolean(lesson.isRecurringInstance),
     recurring_series_id: lesson.recurringSeriesId || null,
+    event_type: lesson.eventType || (isGeneric ? 'appuntamento' : 'lezione'),
+    event_category: lesson.eventCategory || null,
+    event_color: lesson.eventColor || null,
+    description: lesson.description || null,
     topics_covered: lesson.topicsCovered || null,
     songs_studied: lesson.songsStudied || [],
     lesson_rating: lesson.lessonRating || null,
     homework: lesson.homework || null,
     next_goals: lesson.nextGoals || null,
-    notes: lesson.notes || null,
+    notes: finalNotes,
   };
 }
 
@@ -328,6 +367,13 @@ export async function syncAcademicYearToSupabase(year: AcademicYear): Promise<vo
   const payload = mapAcademicYearToDb(year);
   const { error } = await client.from('academic_years').upsert(payload, { onConflict: 'id' });
   if (error) console.error('Supabase error upserting academic_year:', error.message);
+}
+
+export async function deleteAcademicYearFromSupabase(yearId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+  const { error } = await client.from('academic_years').delete().eq('id', yearId);
+  if (error) console.error('Supabase error deleting academic_year:', error.message);
 }
 
 export async function syncCourseToSupabase(course: Course, activeYearId: string): Promise<void> {

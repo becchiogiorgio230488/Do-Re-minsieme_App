@@ -16,7 +16,8 @@ import {
   Lesson, 
   SchoolQuote, 
   AcademicYear, 
-  AttachmentFile 
+  AttachmentFile,
+  CalendarEventType 
 } from './types';
 
 // Components
@@ -42,10 +43,11 @@ import { YearManagerModal } from './components/years/YearManagerModal';
 import { BackupModal } from './components/BackupModal';
 import { QuickNewModal } from './components/QuickNewModal';
 import { SupabaseModal } from './components/SupabaseModal';
-import { isSupabaseConfigured } from './services/supabaseClient';
+import { isSupabaseConfigured, subscribeToRealtimeChanges } from './services/supabaseClient';
 import {
   fetchCompleteAppStateFromSupabase,
   syncAcademicYearToSupabase,
+  deleteAcademicYearFromSupabase,
   syncCourseToSupabase,
   deleteCourseFromSupabase,
   syncStudentToSupabase,
@@ -68,6 +70,7 @@ export default function App() {
   // Destructure for easy access
   const { years, activeYearId, courses, students, payments, lessons, quotes } = appData;
   const activeYear = years.find((y) => y.id === activeYearId) || years[0];
+  const currentYear = years.find((y) => y.isCurrent) || years[0];
 
   // Auto-sync state to localStorage whenever appData changes
   useEffect(() => {
@@ -95,6 +98,7 @@ export default function App() {
 
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
   const [lessonToEdit, setLessonToEdit] = useState<Lesson | null>(null);
+  const [lessonModalDefaultType, setLessonModalDefaultType] = useState<CalendarEventType>('lezione');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [preselectedStudentForPayment, setPreselectedStudentForPayment] = useState<Student | null>(null);
@@ -116,27 +120,7 @@ export default function App() {
   const [isCloudConnected, setIsCloudConnected] = useState(() => isSupabaseConfigured());
   const [isInitialSyncing, setIsInitialSyncing] = useState(false);
 
-  // Initial cloud sync on startup if Supabase credentials are configured
-  useEffect(() => {
-    if (isSupabaseConfigured()) {
-      setIsInitialSyncing(true);
-      fetchCompleteAppStateFromSupabase()
-        .then((cloudData) => {
-          if (cloudData && (cloudData.years.length > 0 || cloudData.students.length > 0)) {
-            setAppData(cloudData);
-            setIsCloudConnected(true);
-          }
-        })
-        .catch((err) => {
-          console.warn('Initial Supabase sync error, using local storage cache:', err);
-        })
-        .finally(() => {
-          setIsInitialSyncing(false);
-        });
-    }
-  }, []);
-
-  // Manual sync callback for SupabaseModal
+  // Manual sync callback
   const handleSyncFromCloud = async () => {
     setIsCloudConnected(isSupabaseConfigured());
     if (isSupabaseConfigured()) {
@@ -147,6 +131,70 @@ export default function App() {
       }
     }
   };
+
+  // Realtime subscription & background auto-sync (on startup, tab focus, window visible)
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    // 1. Initial background fetch
+    setIsInitialSyncing(true);
+    fetchCompleteAppStateFromSupabase()
+      .then((cloudData) => {
+        if (cloudData && (cloudData.years.length > 0 || cloudData.students.length > 0)) {
+          setAppData(cloudData);
+          setIsCloudConnected(true);
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial Supabase sync error, using local storage cache:', err);
+      })
+      .finally(() => {
+        setIsInitialSyncing(false);
+      });
+
+    // 2. Real-time postgres changes subscription
+    let unsubscribeRealtime: (() => void) | null = null;
+    try {
+      unsubscribeRealtime = subscribeToRealtimeChanges((table) => {
+        console.log(`[Supabase Realtime] Change detected in table: ${table || 'all'}. Syncing in background...`);
+        fetchCompleteAppStateFromSupabase()
+          .then((freshData) => {
+            if (freshData) {
+              setAppData(freshData);
+              setIsCloudConnected(true);
+            }
+          })
+          .catch((err) => {
+            console.warn('Error during realtime update pull:', err);
+          });
+      });
+    } catch (e) {
+      console.warn('Could not setup realtime subscription:', e);
+    }
+
+    // 3. Auto-sync on window focus / visibility change (when user returns to the tab or app)
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible' && isSupabaseConfigured()) {
+        fetchCompleteAppStateFromSupabase()
+          .then((freshData) => {
+            if (freshData && (freshData.years.length > 0 || freshData.students.length > 0)) {
+              setAppData(freshData);
+              setIsCloudConnected(true);
+            }
+          })
+          .catch((err) => console.warn('Background focus sync error:', err));
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    return () => {
+      if (unsubscribeRealtime) unsubscribeRealtime();
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+    };
+  }, []);
 
   // ======================
   // STATE HANDLERS (ASYNC + SUPABASE SYNC)
@@ -583,9 +631,64 @@ export default function App() {
     }
   };
 
+  // Delete academic year handler (with cascade cleanup on Supabase)
+  const handleDeleteYear = async (yearId: string) => {
+    if (years.length <= 1) return;
+
+    // Remaining years
+    const remainingYears = years.filter((y) => y.id !== yearId);
+    let nextActiveId = activeYearId;
+    if (activeYearId === yearId) {
+      const fallback = remainingYears.find((y) => y.isCurrent) || remainingYears[0];
+      nextActiveId = fallback ? fallback.id : '';
+    }
+
+    setAppData((prev) => ({
+      ...prev,
+      years: remainingYears,
+      activeYearId: nextActiveId,
+      // Filter out courses, lessons, payments, quotes tied to the deleted year
+      courses: prev.courses.filter((c) => c.academicYearId !== yearId),
+      lessons: prev.lessons.filter((l) => l.academicYearId !== yearId),
+      payments: prev.payments.filter((p) => p.academicYearId !== yearId),
+      quotes: prev.quotes.filter((q) => q.academicYearId !== yearId),
+    }));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await deleteAcademicYearFromSupabase(yearId);
+      } catch (err) {
+        console.error('Error deleting academic year from Supabase:', err);
+      }
+    }
+  };
+
+  // Set academic year as current
+  const handleSetCurrentYear = async (yearId: string) => {
+    const updatedYears = years.map((y) => ({
+      ...y,
+      isCurrent: y.id === yearId,
+    }));
+
+    setAppData((prev) => ({
+      ...prev,
+      years: updatedYears,
+    }));
+
+    if (isSupabaseConfigured()) {
+      try {
+        for (const y of updatedYears) {
+          await syncAcademicYearToSupabase(y);
+        }
+      } catch (err) {
+        console.error('Error setting current academic year on Supabase:', err);
+      }
+    }
+  };
+
   // Handle Quick New Action launcher
   const handleQuickNewAction = (
-    action: 'student' | 'payment' | 'recurring' | 'singleLesson' | 'course' | 'quote'
+    action: 'student' | 'payment' | 'recurring' | 'singleLesson' | 'genericEvent' | 'course' | 'quote'
   ) => {
     if (action === 'student') {
       setStudentToEdit(null);
@@ -599,6 +702,11 @@ export default function App() {
       setIsRecurringModalOpen(true);
     } else if (action === 'singleLesson') {
       setLessonToEdit(null);
+      setLessonModalDefaultType('lezione');
+      setIsLessonModalOpen(true);
+    } else if (action === 'genericEvent') {
+      setLessonToEdit(null);
+      setLessonModalDefaultType('appuntamento');
       setIsLessonModalOpen(true);
     } else if (action === 'course') {
       setCourseToEdit(null);
@@ -635,17 +743,20 @@ export default function App() {
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Historical Archive Banner if active year is not current */}
-        {!activeYear?.isCurrent && (
-          <div className="mb-6 p-3 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between text-xs text-amber-900">
-            <div>
-              <strong>Archivio Storico Attivo:</strong> Stai visualizzando i dati dell Anno Scolastico <strong>{activeYear?.label}</strong>.
+        {/* Historical Archive Banner: shows ONLY if activeYear is strictly different from currentYear */}
+        {currentYear && activeYear && activeYear.id !== currentYear.id && (
+          <div className="mb-6 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between text-xs text-amber-950 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <span>
+                <strong>Archivio Storico Attivo:</strong> Stai visualizzando i dati dell Anno Scolastico <strong>{activeYear.label || activeYear.id}</strong>.
+              </span>
             </div>
             <button
-              onClick={() => handleSelectActiveYear('2026-2027')}
-              className="px-3 py-1 bg-amber-200 hover:bg-amber-300 rounded-lg font-bold text-amber-950 transition-colors"
+              onClick={() => handleSelectActiveYear(currentYear.id)}
+              className="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-lg font-bold text-amber-950 transition-colors cursor-pointer shrink-0 ml-3"
             >
-              Torna all Anno Corrente (2026/2027)
+              Torna all Anno Corrente ({currentYear.label || currentYear.id})
             </button>
           </div>
         )}
@@ -714,8 +825,9 @@ export default function App() {
             students={students}
             courses={courses}
             activeYearId={activeYearId}
-            onNewSingleLesson={(date) => {
-              setLessonToEdit(null);
+            onNewSingleLesson={(date, type) => {
+              setLessonToEdit(date ? ({ date } as any) : null);
+              setLessonModalDefaultType(type || 'lezione');
               setIsLessonModalOpen(true);
             }}
             onPlanRecurring={() => {
@@ -724,6 +836,7 @@ export default function App() {
             }}
             onSelectLesson={(lesson) => {
               setLessonToEdit(lesson);
+              setLessonModalDefaultType(lesson.eventType || 'lezione');
               setIsLessonModalOpen(true);
             }}
           />
@@ -876,7 +989,7 @@ export default function App() {
         preselectedStudent={preselectedStudentForLesson}
       />
 
-      {/* 7. Single Lesson Modal (Move / Reschedule / Cancel single instance) */}
+      {/* 7. Single Lesson Modal (Move / Reschedule / Cancel single instance / Generic Appointment) */}
       <LessonModal
         isOpen={isLessonModalOpen}
         onClose={() => setIsLessonModalOpen(false)}
@@ -888,6 +1001,7 @@ export default function App() {
         students={students}
         courses={courses}
         activeYearId={activeYearId}
+        defaultEventType={lessonModalDefaultType}
       />
 
       {/* 8. Payment Modal */}
@@ -939,6 +1053,8 @@ export default function App() {
         activeYearId={activeYearId}
         onSelectActiveYear={handleSelectActiveYear}
         onAddYear={handleAddYear}
+        onDeleteYear={handleDeleteYear}
+        onSetCurrentYear={handleSetCurrentYear}
       />
 
       {/* 13. Backup & Device Sync Modal */}

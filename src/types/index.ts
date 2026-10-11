@@ -105,6 +105,9 @@ export interface Payment {
 
 export type LessonStatus = 'programmata' | 'completata' | 'assente' | 'cancellata' | 'recuperata';
 
+export type CalendarEventType = 'lezione' | 'appuntamento';
+export type GenericEventCategory = 'riunione' | 'personale' | 'evento_scuola' | 'scadenza' | 'altro';
+
 export interface Lesson {
   id: string;
   academicYearId: string;
@@ -121,6 +124,12 @@ export interface Lesson {
   isRecurringInstance?: boolean;
   recurringSeriesId?: string; // Links recurring instances
   
+  // Appuntamento generico / evento fields
+  eventType?: CalendarEventType; // 'lezione' | 'appuntamento'
+  eventCategory?: GenericEventCategory; // 'riunione' | 'personale' | 'evento_scuola' | 'scadenza' | 'altro'
+  eventColor?: string; // Colore personalizzato hex
+  description?: string; // Dettagli appuntamento generico
+
   // Didactic diary & repertoire fields
   topicsCovered?: string; // Argomenti trattati (es. "Riscaldamento diaframmatico, passaggi di registro, dizione")
   songsStudied?: string[]; // Nomi o titoli dei brani studiati in questa lezione

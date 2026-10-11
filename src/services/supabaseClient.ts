@@ -19,7 +19,10 @@ export function getSupabaseConfig(): SupabaseConfig {
   const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
   const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-  if (envUrl && envKey) {
+  const isPlaceholderUrl = !envUrl || envUrl.includes('your-project-id') || envUrl.includes('example.com');
+  const isPlaceholderKey = !envKey || envKey.includes('your-anon-public-key');
+
+  if (envUrl && envKey && !isPlaceholderUrl && !isPlaceholderKey) {
     return {
       url: envUrl.trim(),
       anonKey: envKey.trim(),
@@ -198,3 +201,41 @@ export async function uploadRegistrationSheetToStorage(
     return fileObj.dataUrl;
   }
 }
+
+/**
+ * Subscribes to real-time postgres changes across the database.
+ * Calls onDataChanged callback when any change (INSERT, UPDATE, DELETE) is detected.
+ */
+export function subscribeToRealtimeChanges(onDataChanged: (table?: string) => void): (() => void) | null {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const channel = client
+      .channel('doreminsieme-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          onDataChanged(payload.table);
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.warn('Realtime subscription error:', err);
+        }
+      });
+
+    return () => {
+      try {
+        client.removeChannel(channel);
+      } catch (e) {
+        // Safe channel teardown
+      }
+    };
+  } catch (err) {
+    console.warn('Could not establish Supabase realtime subscription:', err);
+    return null;
+  }
+}
+

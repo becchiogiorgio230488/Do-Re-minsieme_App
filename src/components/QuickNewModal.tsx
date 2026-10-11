@@ -1,10 +1,10 @@
 import React from 'react';
-import { X, UserPlus, CreditCard, Repeat, Music, Building2, CalendarPlus } from 'lucide-react';
+import { X, UserPlus, CreditCard, Repeat, Music, Building2, CalendarPlus, Pin } from 'lucide-react';
 
 interface QuickNewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectAction: (action: 'student' | 'payment' | 'recurring' | 'singleLesson' | 'course' | 'quote') => void;
+  onSelectAction: (action: 'student' | 'payment' | 'recurring' | 'singleLesson' | 'genericEvent' | 'course' | 'quote') => void;
 }
 
 export const QuickNewModal: React.FC<QuickNewModalProps> = ({
@@ -30,11 +30,11 @@ export const QuickNewModal: React.FC<QuickNewModalProps> = ({
       color: 'bg-amber-50 text-amber-600 border-amber-200',
     },
     {
-      id: 'recurring' as const,
-      title: 'Pianifica Lezione Ricorrente',
-      desc: 'Es. allievo tutti i martedì dalle 14:00 alle 15:00 da data a data.',
-      icon: Repeat,
-      color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+      id: 'genericEvent' as const,
+      title: 'Nuovo Appuntamento / Evento Generico',
+      desc: 'Riunione docenti, saggio scuola, impegno personale o scadenza.',
+      icon: Pin,
+      color: 'bg-indigo-50 text-indigo-600 border-indigo-200',
     },
     {
       id: 'singleLesson' as const,
@@ -42,6 +42,13 @@ export const QuickNewModal: React.FC<QuickNewModalProps> = ({
       desc: 'Aggiungi un singolo appuntamento o recupero per una data specifica.',
       icon: CalendarPlus,
       color: 'bg-cyan-50 text-cyan-600 border-cyan-200',
+    },
+    {
+      id: 'recurring' as const,
+      title: 'Pianifica Lezione Ricorrente',
+      desc: 'Es. allievo tutti i martedì dalle 14:00 alle 15:00 da data a data.',
+      icon: Repeat,
+      color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
     },
     {
       id: 'course' as const,

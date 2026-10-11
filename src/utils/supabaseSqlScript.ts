@@ -79,6 +79,11 @@ CREATE TABLE IF NOT EXISTS public.lessons (
     status TEXT NOT NULL DEFAULT 'programmata', -- 'programmata', 'completata', 'assente', etc.
     is_recurring_instance BOOLEAN DEFAULT FALSE,
     recurring_series_id TEXT,
+    -- Campi per appuntamenti ed eventi generici del calendario
+    event_type TEXT DEFAULT 'lezione',          -- 'lezione' | 'appuntamento'
+    event_category TEXT,                       -- 'riunione', 'personale', 'evento_scuola', 'scadenza', 'altro'
+    event_color TEXT,                          -- Colore esadecimale badge
+    description TEXT,                          -- Descrizione estesa dell'evento
     topics_covered TEXT,                       -- Argomenti trattati a lezione
     songs_studied JSONB DEFAULT '[]'::jsonb,   -- Titoli brani affrontati nella lezione
     lesson_rating TEXT,                        -- 'eccellente', 'ottimo', 'buono', etc.
@@ -87,6 +92,12 @@ CREATE TABLE IF NOT EXISTS public.lessons (
     notes TEXT,                                -- Note libere del docente
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Colonne aggiuntive per retrocompatibilità su tabelle lessons preesistenti
+ALTER TABLE public.lessons ADD COLUMN IF NOT EXISTS event_type TEXT DEFAULT 'lezione';
+ALTER TABLE public.lessons ADD COLUMN IF NOT EXISTS event_category TEXT;
+ALTER TABLE public.lessons ADD COLUMN IF NOT EXISTS event_color TEXT;
+ALTER TABLE public.lessons ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- 5. TABELLA: PAGAMENTI E RICEVUTE (payments)
 CREATE TABLE IF NOT EXISTS public.payments (
