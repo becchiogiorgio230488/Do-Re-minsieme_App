@@ -58,9 +58,9 @@ export function exportQuoteToPdf(quote: SchoolQuote): void {
   // ==========================================
   // Brand name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  doc.setFontSize(20);
   doc.setTextColor(225, 29, 72); // Rose-600
-  doc.text('DO-RE-MINSIEME', marginX, y);
+  doc.text('DO-RE-MINSIEME', marginX, y + 2);
 
   // Quote reference block on top right
   doc.setFont('helvetica', 'bold');
@@ -78,7 +78,7 @@ export function exportQuoteToPdf(quote: SchoolQuote): void {
   doc.setTextColor(100, 116, 139); // slate-500
   doc.text(`Data: ${formatDateLong(quote.date)}`, pageWidth - marginX, y + 8, { align: 'right' });
 
-  y += 5;
+  y += 7.5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
@@ -88,7 +88,7 @@ export function exportQuoteToPdf(quote: SchoolQuote): void {
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('Laboratori e Corsi Didattico-Musicali nelle Scuole dell\'Infanzia e Primarie', marginX, y);
+  doc.text('Laboratori e Corsi Didattico-Musicali nelle Scuole', marginX, y);
 
   y += 6;
   // Rose accent divider line

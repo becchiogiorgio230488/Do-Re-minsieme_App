@@ -12,20 +12,22 @@ export const LogoDoReMInsieme: React.FC<LogoProps> = ({
   showText = true,
 }) => {
   const sizeMap = {
-    sm: { height: 32, scale: 0.7 },
-    md: { height: 44, scale: 1 },
-    lg: { height: 60, scale: 1.35 },
-    xl: { height: 80, scale: 1.8 },
+    sm: { height: 36 },
+    md: { height: 48 },
+    lg: { height: 64 },
+    xl: { height: 84 },
   };
 
   const { height } = sizeMap[size];
+  const viewBox = showText ? '30 5 330 200' : '30 5 330 165';
 
   return (
-    <div className={`inline-flex items-center select-none ${className}`}>
+    <div className={`inline-flex items-center select-none shrink-0 ${className}`}>
       <svg
-        viewBox="0 0 380 200"
+        viewBox={viewBox}
         height={height}
-        className="w-auto overflow-visible"
+        style={{ height: `${height}px`, width: 'auto', display: 'block' }}
+        className="w-auto max-w-full overflow-visible"
         xmlns="http://www.w3.org/2000/svg"
         aria-label="Logo Do-Re-MInsieme"
       >

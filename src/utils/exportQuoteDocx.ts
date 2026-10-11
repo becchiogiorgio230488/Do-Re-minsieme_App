@@ -84,7 +84,7 @@ export async function exportQuoteToWord(quote: SchoolQuote): Promise<void> {
             spacing: { after: 300 },
             children: [
               new TextRun({
-                text: 'Laboratori e Corsi Didattico-Musicali nelle Scuole dell\'Infanzia e Primarie',
+                text: 'Laboratori e Corsi Didattico-Musicali nelle Scuole',
                 italics: true,
                 size: 18, // 9pt
                 color: '64748B',

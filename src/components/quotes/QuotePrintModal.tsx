@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { SchoolQuote } from '../../types';
 import { formatDateLong, formatCurrency } from '../../utils/dateHelpers';
-import { LogoDoReMInsieme } from '../Logo';
 import { exportQuoteToWord } from '../../utils/exportQuoteDocx';
 import { exportQuoteToPdf } from '../../utils/exportQuotePdf';
 
@@ -148,19 +147,16 @@ export const QuotePrintModal: React.FC<QuotePrintModalProps> = ({
           
           {/* Official Letterhead */}
           <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b-2 border-rose-500 pb-5">
-            <div className="flex items-center gap-3">
-              <LogoDoReMInsieme size="md" />
-              <div>
-                <h1 className="text-base font-black text-slate-900 tracking-tight">
-                  DO-RE-MINSIEME
-                </h1>
-                <p className="text-xs font-semibold text-rose-600">
-                  Scuola di Canto e Propedeutica Musicale
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  Laboratori Didattici nelle Scuole dell Infanzia e Primarie
-                </p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-black text-rose-600 tracking-tight leading-tight">
+                DO-RE-MINSIEME
+              </h1>
+              <p className="text-xs font-bold text-slate-800 mt-0.5">
+                Scuola di Canto e Propedeutica Musicale
+              </p>
+              <p className="text-[11px] text-slate-500 font-medium italic mt-0.5">
+                Laboratori e Corsi Didattico-Musicali nelle Scuole
+              </p>
             </div>
 
             <div className="text-right sm:text-right">
